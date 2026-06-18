@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐾 Encontre.me - Animais Perdidos & Achados</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div>
+                <h1><i class="fas fa-paw" style="color: #f9b84a;"></i> Encontre.me</h1>
+                <div class="subhead">Cadastro de animais perdidos e achados · com fotos!</div>
+            </div>
+            <div>
+                <span class="total-badge"><i class="fas fa-list"></i> {{ animais.length }} registros</span>
+            </div>
+        </header>
+
+        <div class="grid-painel">
+            <!-- FORMULÁRIO -->
+            <div class="card">
+                <div class="card-titulo">
+                    <i class="fas fa-edit"></i> {{ editando ? 'Editar registro' : 'Novo registro' }}
+                </div>
+                <form @submit.prevent="salvarAnimal" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Nome / apelido *</label>
+                        <input type="text" v-model="form.nome" placeholder="Ex: Fred, Lola..." required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-paw"></i> Espécie</label>
+                        <select v-model="form.especie">
+                            <option value="Cachorro">🐶 Cachorro</option>
+                            <option value="Gato">🐱 Gato</option>
+                            <option value="Pássaro">🐦 Pássaro</option>
+                            <option value="Roedor">🐹 Roedor</option>
+                            <option value="Outro">🦔 Outro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-pin"></i> Local (bairro/cidade) *</label>
+                        <input type="text" v-model="form.local" placeholder="Ex: Centro, Jardins..." required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-info-circle"></i> Descrição</label>
+                        <textarea v-model="form.descricao" placeholder="Pelagem, coleira, comportamento..."></textarea>
+                    </div>
+                    
+                    <!-- UPLOAD DE FOTO -->
+                    <div class="form-group">
+                        <label><i class="fas fa-camera"></i> Foto do animal</label>
+                        <div class="foto-container">
+                            <div v-if="form.fotoPreview" class="foto-preview-wrapper">
+                                <img :src="form.fotoPreview" alt="Foto do animal" class="foto-preview">
+                            </div>
+                            <div v-else class="foto-placeholder">
+                                <i class="fas fa-paw"></i>
+                            </div>
+                            <div class="upload-btn-wrapper">
+                                <div class="btn-upload">
+                                    <i class="fas fa-upload"></i> 
+                                    {{ form.fotoPreview ? 'Trocar foto' : 'Escolher foto' }}
+                                </div>
+                                <input type="file" accept="image/*" @change="onFileChange" ref="fileInput">
+                            </div>
+                            <button type="button" v-if="form.fotoPreview" @click="removerFoto" class="btn btn-danger btn-sm">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <small style="color: #6a859b; display: block; margin-top: 6px;">
+                            <i class="fas fa-info-circle"></i> Formatos: JPG, PNG, GIF, WebP (máx. 5MB)
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Status</label>
+                        <div class="radio-group">
+                            <label><input type="radio" value="perdido" v-model="form.status"> <span class="badge perdido">Perdido</span></label>
+                            <label><input type="radio" value="achado" v-model="form.status"> <span class="badge achado">Achado</span></label>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> {{ editando ? 'Atualizar' : 'Cadastrar' }}
+                        </button>
+                        <button type="button" class="btn btn-outline" @click="limparForm" v-if="editando">
+                            <i class="fas fa-times"></i> Cancelar
+                        </button>
+                    </div>
+                    <div v-if="mensagem" class="status-msg" :class="mensagemTipo">
+                        <i class="fas fa-check-circle"></i> {{ mensagem }}
+                    </div>
+                </form>
+            </div>
+
+            <!-- LISTA -->
+            <div class="card">
+                <div class="card-titulo">
+                    <i class="fas fa-list-ul"></i> Registros
+                </div>
+                <div class="filtros">
+                    <input type="text" v-model="filtro.nome" placeholder="🔍 Nome...">
+                    <select v-model="filtro.status">
+                        <option value="">Todos</option>
+                        <option value="perdido">Perdido</option>
+                        <option value="achado">Achado</option>
+                    </select>
+                    <select v-model="filtro.especie">
+                        <option value="">Espécie</option>
+                        <option value="Cachorro">Cachorro</option>
+                        <option value="Gato">Gato</option>
+                        <option value="Pássaro">Pássaro</option>
+                        <option value="Roedor">Roedor</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                    <button class="btn btn-outline btn-sm" @click="limparFiltros"><i class="fas fa-undo-alt"></i></button>
+                </div>
+
+                <div class="lista-animais">
+                    <div v-if="carregando" class="vazio">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                        <p>Carregando...</p>
+                    </div>
+                    <div v-else-if="animaisFiltrados.length === 0" class="vazio">
+                        <i class="fas fa-dog" style="font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 10px;"></i>
+                        Nenhum animal encontrado.
+                    </div>
+                    <div v-for="animal in animaisFiltrados" :key="animal.id" class="item-animal" :class="animal.status">
+                        <div class="info-animal">
+                            <div class="foto-detalhe">
+                                <img v-if="animal.foto" :src="'http://localhost:3000/uploads/' + animal.foto" alt="Foto" class="foto-miniatura">
+                                <div v-else class="sem-foto">
+                                    <i class="fas fa-paw"></i>
+                                </div>
+                                <div>
+                                    <strong>{{ animal.nome }}</strong>
+                                    <span><i class="fas fa-{{ animal.especie === 'Cachorro' ? 'dog' : 'cat' }}"></i> {{ animal.especie }} · {{ animal.local }}</span>
+                                </div>
+                            </div>
+                            <span class="badge" :class="animal.status">{{ animal.status === 'perdido' ? '😔 Perdido' : '😊 Achado' }}</span>
+                            <small style="color:#597a91;">{{ animal.descricao || 'Sem descrição' }}</small>
+                        </div>
+                        <div class="acoes-item">
+                            <button class="btn btn-outline btn-sm" @click="editarAnimal(animal)"><i class="fas fa-pen"></i></button>
+                            <button class="btn btn-danger btn-sm" @click="excluirAnimal(animal.id)"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <i class="fas fa-code"></i> Desenvolvido com Vue.js + Node.js + MySQL · 2026
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
